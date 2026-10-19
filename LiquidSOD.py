@@ -125,53 +125,6 @@ class Reduction(nn.Module):
         return self.eca(x)
 
 
-class SEM(nn.Module):
-    def __init__(self, c_in, c_feat, c_atten):
-        super(SEM, self).__init__()
-        self.c_feat = c_feat
-        self.c_atten = c_atten
-        self.conv_feat = nn.Conv2d(c_in, c_feat, kernel_size=1)
-        self.conv_atten = nn.Conv2d(c_in, c_atten, kernel_size=1)
-
-    def forward(self, input):
-        # input: [B, C, H, W]
-        b, c, h, w = input.size()
-
-        feat = self.conv_feat(input).view(b, self.c_feat, -1)  # [B, c_feat, HW]
-        atten = self.conv_atten(input).view(b, self.c_atten, -1)  # [B, c_atten, HW]
-        atten = F.softmax(atten, dim=-1)
-
-        descriptors = torch.bmm(feat, atten.permute(0, 2, 1))
-
-        return descriptors  # [B, c_feat, c_atten]
-
-
-class SDM(nn.Module):
-    def __init__(self, c_in, c_feat, c_atten):
-        super(SDM, self).__init__()
-        self.c_atten = c_atten
-        self.c_feat = c_feat
-
-        self.conv_atten = nn.Conv2d(c_in, c_atten, kernel_size=1)
-        self.out_conv = nn.Conv2d(c_feat, c_in, kernel_size=1)
-
-    def forward(self, input, descriptors):
-        """
-        input: 当前特征图 [B, C, H, W] (作为 Query)
-        descriptors: 全局语义字典 [B, c_feat, c_atten] (来自 SEM)
-        """
-        b, c, h, w = input.size()
-
-        atten_vectors = self.conv_atten(input).view(b, self.c_atten, -1)  # [B, c_atten, HW]
-        atten_vectors = F.softmax(atten_vectors, dim=1)
-
-        # (c_feat, c_atten) * (c_atten, HW) -> (c_feat, HW)
-        out_feat = torch.bmm(descriptors, atten_vectors)
-
-        out_feat = out_feat.view(b, self.c_feat, h, w)
-
-        return self.out_conv(out_feat)
-
 # LiquidSOD
 class LiquidSOD(nn.Module):
     def __init__(self, channel=48):
